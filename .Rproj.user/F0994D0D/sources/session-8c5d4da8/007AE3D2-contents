@@ -1,0 +1,88 @@
+# Basic ETL
+rm(list=ls()) # removes all variables stored previously
+library(Hmisc) # many functions, such as: describe(data)
+# Load necessary libraries for visualization:
+library(ggplot2)
+
+# many functions, such as: select(data, fields)
+library(dplyr)
+
+data_url = "dataset/COVID19_line_list_data.csv"
+
+raw_data <- read.csv(data_url)
+describe(raw_data) # Hmisc command
+
+# cleaned up death column
+# Note that in some rows, the "death" field has instead of 1, the date of death (ex. #201, #214),
+# though, having the date of death means that the death is confirmed, i.e., it is also 1
+# Therefore, let's create a new Boolean field which is 1 whenever death is not 0
+raw_data$death_B <- as.integer(raw_data$death != 0)
+
+# survival status: It's the opposite of the Boolean field death_B:
+raw_data$survival <- as.integer(raw_data$death_B == 0)
+
+unnecessary_fields <- c("summary", "death", "X", "X.1", "X.2", "X.3", "X.4", "X.5", "X.6", "symptom_onset", "If_onset_approximated", "symptom", "source", "link")
+
+filtered_data <- raw_data %>%
+  select(-one_of(unnecessary_fields))
+
+# death rate
+sum(filtered_data$death_B) / nrow(filtered_data)
+
+# AGE
+# claim: people who die are older
+dead = subset(filtered_data, death_B == 1)
+alive = subset(filtered_data, death_B == 0)
+mean(dead$age, na.rm = TRUE)
+mean(alive$age, na.rm = TRUE)
+
+# is this statistically significant?
+t_test_age <- t.test(alive$age, dead$age, alternative="two.sided", conf.level = 0.95)
+print(t_test_age)
+
+# normally, if p-value < 0.05, we reject null hypothesis
+# here, p-value ~ 0
+# A very small p-value indicates strong evidence against the null hypothesis.
+# so we reject the null hypothesis and 
+# conclude that this is statistically significant
+
+# Visualization: Boxplot of Age by Survival Status
+ggplot(filtered_data, aes(x = death_B, y = age, fill = factor(survival))) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Age by Survival Status",
+       x = "Survival Status",
+       y = "Age",
+       fill = "Survival Status") +
+  theme_minimal()
+
+
+# GENDER
+# Let's check the significance of the gender (male/female) on the rate of death among patients
+# In other words, is gender a significant factor in the probability of death or suvival?
+
+# let's sort the dataset into two categories (subsets): men and women:
+men = subset(filtered_data, gender == "male")
+women = subset(filtered_data, gender == "female")
+
+# Let's calculate the probability of death for each category, taking advantage of the fact that
+# the variable death_B is Boolean, though it is represented as an integer (zero or one)
+# and zero means the impossible event of death (i.e., survived), while one represents the certain 
+# event (i.e., death):
+mean(men$death_B, na.rm = TRUE) # output: probability of death among men is: 0.085
+mean(women$death_B, na.rm = TRUE) #output: probability of death among men is: 0.037
+
+# is this statistically significant?
+# Let's run the T-Test, with a confidence of 99%:
+t_test_gender <- t.test(men$death_B, women$death_B, alternative="two.sided", conf.level = 0.99)
+print(t_test_gender)
+
+# Conclusion: With a 99% confidence: men have from 0.8% to 8.8% higher chance
+# of dying.
+# p-value = 0.002 < 0.05, so, this is statistically
+# significant
+
+
+
+
+
+

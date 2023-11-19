@@ -1,0 +1,141 @@
+# Basic ETL
+# Remove previously-stored variables  
+rm(list=ls())
+
+# Load necessary libraries for data analysis and visualization
+library(Hmisc) # Provides functions like describe(data)
+library(ggplot2) # A versatile plotting package
+library(dplyr) # For data manipulation and selection
+
+
+# Define the URL of the dataset
+data_url <- "dataset/COVID19_line_list_data.csv"
+
+# Read the dataset from the specified URL
+raw_data <- read.csv(data_url)
+
+# Display descriptive statistics for the raw data
+describe(raw_data)
+
+# Clean up the 'death' column
+# Some rows in the "death" field have the date of death instead of 1.
+# If there's a date, it confirms death, so create a new Boolean field 'death_B'.
+raw_data$death_B <- as.integer(raw_data$death != 0)
+
+# Create a 'survival' field that is the opposite of the 'death_B' field
+raw_data$survival <- as.integer(raw_data$death_B == 0)
+
+# List of unnecessary fields to remove
+unnecessary_fields <- c("summary", "death", "X", "X.1", "X.2", "X.3", "X.4", "X.5", "X.6", 
+                        "symptom_onset", "If_onset_approximated", "symptom", "source", "link")
+
+# Remove unnecessary fields from the dataset
+filtered_data <- raw_data %>%
+  select(-one_of(unnecessary_fields))
+
+
+# Calculate and display the death rate
+death_rate <- sum(filtered_data$death_B) / nrow(filtered_data)
+cat("Death Rate:", death_rate, "\n")
+
+# Analyze AGE
+# Claim: People who die are older
+dead <- subset(filtered_data, death_B == 1)
+alive <- subset(filtered_data, death_B == 0)
+
+# Calculate the mean age for both dead and alive individuals
+mean_age_dead <- mean(dead$age, na.rm = TRUE)
+mean_age_alive <- mean(alive$age, na.rm = TRUE)
+cat("Mean Age (Dead):", mean_age_dead, "\n")
+cat("Mean Age (Alive):", mean_age_alive, "\n")
+
+
+
+# Perform a t-test to check the statistical significance of the age difference
+t_test_age <- t.test(alive$age, dead$age, alternative="two.sided", conf.level = 0.95)
+print(t_test_age)
+
+
+# Visualization: Boxplot of Age by Survival Status
+ggplot(filtered_data, aes(x = factor(survival), y = age, fill = factor(survival))) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Age by Survival Status",
+       x = "Survival Status",
+       y = "Age",
+       fill = "Survival Status") +
+  theme_minimal()
+
+
+# Analyze GENDER
+# Check the significance of gender (male/female) on the rate of death among patients
+men <- subset(filtered_data, gender == "male")
+women <- subset(filtered_data, gender == "female")
+
+# Calculate the probability of death for each gender category
+prob_death_men <- mean(men$death_B, na.rm = TRUE)
+prob_death_women <- mean(women$death_B, na.rm = TRUE)
+cat("Probability of Death (Men):", prob_death_men, "\n")
+cat("Probability of Death (Women):", prob_death_women, "\n")
+
+# Perform a t-test to check the statistical significance of the gender difference
+t_test_gender <- t.test(men$death_B, women$death_B, alternative="two.sided", conf.level = 0.99)
+print(t_test_gender)
+
+
+
+# Visualization: Barplot of Probability of Death by Gender
+gender_probs <- data.frame(Gender = c("Men", "Women"), Probability_of_Death = c(prob_death_men, prob_death_women))
+ggplot(gender_probs, aes(x = Gender, y = Probability_of_Death, fill = Gender)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Probability of Death by Gender",
+       x = "Gender",
+       y = "Probability of Death",
+       fill = "Gender") +
+  theme_minimal()
+
+
+# ############# Distribution of cases across different countries #############
+# Visualization: Barplot of Number of Cases by Country
+cases_by_country <- filtered_data %>%
+  group_by(country) %>%
+  summarise(total_cases = n())
+
+ggplot(cases_by_country, aes(x = reorder(country, -total_cases), y = total_cases, fill = country)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Number of COVID-19 Cases by Country",
+       x = "Country",
+       y = "Number of Cases",
+       fill = "Country") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Statistical Analysis: ANOVA to test if there are significant differences between countries
+anova_result <- aov(total_cases ~ country, data = cases_by_country)
+summary(anova_result)
+
+# Conclusion: The ANOVA test assesses if there are significant differences in the number of cases between countries.
+# If the p-value is less than the significance level (e.g., 0.05), we reject the null hypothesis.
+# If the p-value is low, it suggests that at least one country has a significantly different number of cases.
+# The bar chart visually shows the distribution of cases, and the ANOVA result helps confirm if there are significant differences.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

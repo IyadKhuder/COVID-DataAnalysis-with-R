@@ -1,0 +1,40 @@
+
+
+# Visualization: Barplot of Number of Cases by Country
+cases_by_country <- filtered_data %>%
+  group_by(country) %>%
+  summarise(total_cases = n())
+
+
+
+
+ggplot(cases_by_country, aes(x = reorder(country, -total_cases), y = total_cases, fill = country)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Number of COVID-19 Cases by Country",
+       x = "Country",
+       y = "Number of Cases",
+       fill = "Country") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+
+
+
+# Statistical Analysis: ANOVA to test if there are significant differences between countries
+anova_result <- aov(total_cases ~ country, data = cases_by_country)
+summary(anova_result)
+
+# Conclusion: The ANOVA test assesses if there are significant differences in the number of cases between countries.
+# If the p-value is less than the significance level (e.g., 0.05), we reject the null hypothesis.
+# If the p-value is low, it suggests that at least one country has a significantly different number of cases.
+# The bar chart visually shows the distribution of cases, and the ANOVA result helps confirm if there are significant differences.
+
+
+
+model <- aov(total_cases ~ country, data = cases_by_country)
+
+# Obtain the ANOVA table with complete information
+anova_result <- anova(model)
+summary(anova_result)
+
